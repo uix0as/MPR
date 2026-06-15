@@ -1,54 +1,57 @@
-# 아이템 Tic-Tac-Go
+# Mario Pipe Rush: FIFO Delivery
 
-Pygame으로 구현한 퍼즐 / 이동형 틱택고 게임입니다.
+A Python + Pygame 2D pixel platform puzzle action game. The player runs and jumps through a pipe kingdom, collects delivery items, and must satisfy orders using real Queue and Stack rules.
 
-## 실행 방법
+## Core Data Structure Idea
 
-Python 3.10-3.12 사용을 권장합니다. VS Code에서는 이 폴더를 열고 아래 명령을 터미널에서 실행하면 됩니다.
+- `delivery_queue` is a `collections.deque`. Orders are processed FIFO, so `delivery_queue[0]` is always the current required delivery.
+- `inventory_stack` is a Python `list`. Items are pushed with `append()` when collected and delivered only from `inventory_stack[-1]`.
+- `spawn_queue` is a `collections.deque` of future item spawn events so the game can stay fair instead of relying only on randomness.
+
+This means the player should read the queue and collect items in reverse order. If the queue is `[Mushroom, Coin, Flower]`, the useful collection order is `Flower -> Coin -> Mushroom`, so the stack top is Mushroom when delivery starts.
+
+## Controls
+
+- `A` / Left: move left
+- `D` / Right: move right
+- `Space`: jump
+- `Shift`: run
+- `E`: deliver the top bag item at the delivery pipe
+- `Q`: return/discard the top bag item at the return pipe
+- `P`: pause
+- `R`: restart from the game-over screen
+- `ESC`: quit
+
+## Install and Run
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
 pip install -r requirements.txt
+python tools/download_assets.py
 python main.py
 ```
 
-현재 프로젝트에는 Python 3.12 기반 `.venv`가 준비되어 있습니다. VS Code에서 실행할 때는 Run and Debug 패널의 `Run TTG (pygame)` 구성을 선택하면 이 가상환경으로 실행됩니다.
+If your system only exposes Python as `python3`, use `python3` for the same commands.
 
-기존 실행 파일 이름을 쓰고 싶다면 아래 명령도 가능합니다.
+## Gameplay
 
-```bash
-python game.py
-```
+You have 120 seconds to complete as many orders as possible. Correct deliveries increase score, combo, and time. Wrong deliveries keep the item in the bag, reset combo, reduce time, and shake the screen. The return pipe lets you recover from mistakes, but only by popping the stack top and paying a penalty.
 
-## 사진 바꾸기
+Implemented item types:
 
-사진은 `assets` 폴더에 넣으면 됩니다.
+- Mushroom: 100 points
+- Coin: 80 points
+- Fire Flower: 150 points
+- Star: 250 points plus a short combo bonus
+- Shell: 120 points
 
-지원하는 파일 이름:
+## Educational Design Note
 
-- `assets/background.png` 또는 `.jpg`: 전체 배경
-- `assets/player.png` 또는 `.jpg`: 직접 움직이는 O
-- `assets/o.png` 또는 `.jpg`: 일반 O
-- `assets/x.png` 또는 `.jpg`: X
-- `assets/wall.png` 또는 `.jpg`: 벽
-- `assets/item.png` 또는 `.jpg`: 아이템
+This game turns a familiar platform-jump style into a delivery puzzle. The order list is a Queue, so older orders must be handled first. The player bag is a Stack, so the newest collected item must come out first. Queue FIFO and Stack LIFO are visible in the HUD and directly control scoring, success, failure, and recovery.
 
-파일을 넣은 뒤 게임을 다시 실행하면 자동 적용됩니다. `player.png`가 없으면 `o.png`를 직접 움직이는 O에도 같이 쓰고, 초록색 표시를 덧그려 구분합니다. 파일이 없으면 기본 도형으로 표시됩니다.
+## Assets and Licensing
 
-## 조작
+`tools/download_assets.py` optionally downloads CC0 Kenney Pixel Platformer sheets through raw GitHub URLs from [uheartbeast/Pixel-Platformer](https://github.com/uheartbeast/Pixel-Platformer). Kenney's official page lists Pixel Platformer as Creative Commons CC0: <https://kenney.nl/assets/pixel-platformer>.
 
-- 방향키 또는 WASD: 이동
-- Z: 실행취소
-- R: 현재 판 재설정
-- N: 새 랜덤 보드
-- ESC: 종료
+No Nintendo sprites, logos, audio, ROM material, or other unlicensed IP are included. The Mario-like feeling is produced with original procedural placeholders: bright sky, green pipes, brick blocks, question blocks, coin particles, and a red-cap platformer character.
 
-## 규칙
-
-- 주인공 O와 일반 O 2개를 포함해 O는 항상 총 3개입니다.
-- O 3개가 가로 또는 세로로 연속되면 승리합니다.
-- X 3개가 가로 또는 세로로 연속되면 패배합니다.
-- 한 번에 X 또는 O 블록 하나만 밀 수 있습니다.
-- 벽은 움직일 수 없고, 아이템은 플레이어가 직접 밟아야 먹을 수 있습니다.
-- ? 아이템은 X 하나 삭제 또는 이동 횟수 추가 효과를 줍니다.
+If downloads fail, the game still runs from generated placeholder PNGs and in-code fallback surfaces. See `assets/CREDITS.md` and `assets/manifest.json` for source, license, URL, and SHA256 details after running the downloader.
