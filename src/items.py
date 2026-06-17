@@ -6,7 +6,7 @@ import pygame
 
 from src.asset_manager import AssetManager
 from src.entities import Entity
-from src.settings import GRAVITY, ITEM_LIFETIME_MS, ITEM_SPECS
+from src.settings import GRAVITY, ITEM_LIFETIME_MS, ITEM_SPECS, SCREEN_WIDTH
 
 
 class Item(Entity):
@@ -41,28 +41,27 @@ class Item(Entity):
 
         self.pos.x += self.vel.x * dt
         self.sync_rect()
-        for platform in platforms:
-            if self.rect.colliderect(platform):
-                if self.vel.x > 0:
-                    self.rect.right = platform.left
-                elif self.vel.x < 0:
-                    self.rect.left = platform.right
-                self.pos.x = self.rect.x
-                self.vel.x *= -0.25
+        if self.rect.left < 0:
+            self.rect.left = 0
+            self.pos.x = self.rect.x
+            self.vel.x = abs(self.vel.x) * 0.6
+        elif self.rect.right > SCREEN_WIDTH:
+            self.rect.right = SCREEN_WIDTH
+            self.pos.x = self.rect.x
+            self.vel.x = -abs(self.vel.x) * 0.6
 
         self.on_ground = False
+        previous_bottom = self.rect.bottom
         self.pos.y += self.vel.y * dt
         self.sync_rect()
         for platform in platforms:
-            if self.rect.colliderect(platform):
-                if self.vel.y > 0:
-                    self.rect.bottom = platform.top
-                    self.on_ground = True
-                    self.vel.y = -abs(self.vel.y) * 0.18 if abs(self.vel.y) > 120 else 0
-                elif self.vel.y < 0:
-                    self.rect.top = platform.bottom
-                    self.vel.y = 0
-                self.pos.y = self.rect.y
+            if self.vel.y <= 0 or previous_bottom > platform.top or not self.rect.colliderect(platform):
+                continue
+            # Items only land on the top face; platform sides should not trap collectibles.
+            self.rect.bottom = platform.top
+            self.on_ground = True
+            self.vel.y = -abs(self.vel.y) * 0.18 if abs(self.vel.y) > 120 else 0
+            self.pos.y = self.rect.y
 
     def draw(self, surface: pygame.Surface, offset: tuple[int, int] = (0, 0)) -> None:
         if self.age_ms > self.lifetime_ms - 1500 and (self.age_ms // 110) % 2 == 0:

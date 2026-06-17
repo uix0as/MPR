@@ -288,7 +288,8 @@ class Game:
     def _spawn_item(self, event: SpawnEvent) -> None:
         pipe = self.pipes[event.pipe_id]
         speed_multiplier = 1.0 + min(0.28, self.system.successful_deliveries * 0.012)
-        self.items.append(Item(self.assets, event.item_kind, pipe.mouth, speed_multiplier))
+        spawn_pos = (pipe.mouth[0] + self.rng.randint(-14, 14), pipe.mouth[1])
+        self.items.append(Item(self.assets, event.item_kind, spawn_pos, speed_multiplier))
         self.particles.smoke(pipe.mouth, 8)
         pipe.trigger_glow()
 
