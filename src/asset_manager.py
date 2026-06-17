@@ -20,6 +20,7 @@ class AssetManager:
         self._sounds: dict[str, pygame.mixer.Sound | None] = {}
         self._item_icons: dict[tuple[str, int], pygame.Surface] = {}
         self._player_cache: dict[tuple[str, int, bool], pygame.Surface] = {}
+        self._character_cache: dict[tuple[int, int], pygame.Surface] = {}
 
     def load_image(
         self,
@@ -139,6 +140,28 @@ class AssetManager:
         surf.blit(text, text.get_rect(center=(size // 2, size // 2 + 1)))
         return surf
 
+    def character_sprite(self, cell_index: int, size: int = 32) -> pygame.Surface:
+        cache_key = (cell_index, size)
+        if cache_key in self._character_cache:
+            return self._character_cache[cache_key].copy()
+
+        try:
+            sheet = self.load_image("characters_packed.png")
+            cell_size = 24
+            columns = max(1, sheet.get_width() // cell_size)
+            rows = max(1, sheet.get_height() // cell_size)
+            cell_index %= columns * rows
+            col = cell_index % columns
+            row = cell_index // columns
+            sprite = pygame.Surface((cell_size, cell_size), pygame.SRCALPHA)
+            sprite.blit(sheet, (0, 0), pygame.Rect(col * cell_size, row * cell_size, cell_size, cell_size))
+            sprite = pygame.transform.scale(sprite, (size, size))
+        except Exception:
+            sprite = self._draw_character_fallback(cell_index, size)
+
+        self._character_cache[cache_key] = sprite
+        return sprite.copy()
+
     def _fallback_surface(
         self,
         size: tuple[int, int],
@@ -152,6 +175,25 @@ class AssetManager:
             font = pygame.font.Font(None, 14)
             text = font.render(Path(label).stem[:3].upper(), False, COLORS["white"])
             surf.blit(text, text.get_rect(center=(size[0] // 2, size[1] // 2)))
+        return surf
+
+    def _draw_character_fallback(self, cell_index: int, size: int) -> pygame.Surface:
+        palette = [
+            ((255, 210, 72), (112, 76, 30)),
+            ((88, 210, 130), (25, 96, 60)),
+            ((91, 157, 255), (31, 69, 142)),
+            ((239, 100, 93), (128, 38, 46)),
+        ]
+        body, shade = palette[cell_index % len(palette)]
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        scale = size / 32
+        pygame.draw.rect(surf, shade, (int(8 * scale), int(12 * scale), int(16 * scale), int(14 * scale)))
+        pygame.draw.rect(surf, body, (int(9 * scale), int(8 * scale), int(14 * scale), int(17 * scale)))
+        pygame.draw.rect(surf, (255, 239, 206), (int(11 * scale), int(5 * scale), int(10 * scale), int(8 * scale)))
+        pygame.draw.rect(surf, (35, 34, 38), (int(13 * scale), int(8 * scale), max(1, int(2 * scale)), max(1, int(2 * scale))))
+        pygame.draw.rect(surf, (35, 34, 38), (int(18 * scale), int(8 * scale), max(1, int(2 * scale)), max(1, int(2 * scale))))
+        pygame.draw.rect(surf, shade, (int(8 * scale), int(25 * scale), int(6 * scale), int(4 * scale)))
+        pygame.draw.rect(surf, shade, (int(18 * scale), int(25 * scale), int(6 * scale), int(4 * scale)))
         return surf
 
     def _draw_item_icon(self, kind: str, size: int) -> pygame.Surface:

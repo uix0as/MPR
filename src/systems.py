@@ -5,7 +5,17 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Deque
 
-from src.settings import BAG_CAPACITY, ITEM_KINDS, ITEM_SPECS, ORDER_QUEUE_TARGET, SPAWN_QUEUE_TARGET
+from src.settings import (
+    BAG_CAPACITY,
+    ITEM_KINDS,
+    ITEM_SPECS,
+    MAX_OFF_QUEUE_STREAK,
+    OFF_QUEUE_ITEM_CHANCE,
+    ORDER_QUEUE_TARGET,
+    RANDOM_ITEM_CHANCE,
+    SPAWN_QUEUE_TARGET,
+    VISIBLE_QUEUE_ITEM_CHANCE,
+)
 
 
 @dataclass
@@ -80,17 +90,25 @@ class DeliverySystem:
     def choose_next_spawn_kind(self, visible_kinds: set[str] | None = None) -> str:
         visible_kinds = visible_kinds or set()
         self.ensure_order_queue(0)
-        next_orders = [order.kind for order in list(self.delivery_queue)[:3]]
+        next_orders = [order.kind for order in list(self.delivery_queue)[:ORDER_QUEUE_TARGET]]
         current_order = self.delivery_queue[0].kind
+        off_queue_kinds = [kind for kind in ITEM_KINDS if kind not in next_orders]
 
-        if not self.inventory_stack and current_order not in visible_kinds and self.rng.random() < 0.88:
+        if not self.inventory_stack and current_order not in visible_kinds and self.rng.random() < 0.82:
             choice = current_order
-        elif self.bad_spawn_streak >= 3:
-            choice = self.rng.choice(next_orders)
-        elif self.rng.random() < 0.70:
+        elif self.bad_spawn_streak >= MAX_OFF_QUEUE_STREAK:
             choice = self.rng.choice(next_orders)
         else:
-            choice = self._weighted_item_choice()
+            # Keep most spawns useful, but let off-queue items appear often enough to preserve planning tension.
+            roll = self.rng.random()
+            if roll < VISIBLE_QUEUE_ITEM_CHANCE:
+                choice = self.rng.choice(next_orders)
+            elif roll < VISIBLE_QUEUE_ITEM_CHANCE + OFF_QUEUE_ITEM_CHANCE and off_queue_kinds:
+                choice = self.rng.choice(off_queue_kinds)
+            elif roll < VISIBLE_QUEUE_ITEM_CHANCE + OFF_QUEUE_ITEM_CHANCE + RANDOM_ITEM_CHANCE:
+                choice = self._weighted_item_choice()
+            else:
+                choice = self.rng.choice(next_orders)
 
         if choice in next_orders:
             self.bad_spawn_streak = 0
@@ -135,6 +153,13 @@ class DeliverySystem:
             return DeliveryResult(False, "BAG EMPTY!")
         item = self.inventory_stack.pop()
         return DeliveryResult(True, f"RETURNED {ITEM_SPECS[item].label}", -20, -1.0, item)
+
+    def refresh_delivery_queue(self, now_ms: int = 0) -> None:
+        queue_length = max(1, len(self.delivery_queue))
+        self.delivery_queue.clear()
+        for _ in range(queue_length):
+            self.add_order(now_ms)
+        self.bad_spawn_streak = 0
 
     def _choose_order_kind(self) -> str:
         weights = []

@@ -108,8 +108,12 @@ class HUD:
         surface.blit(text, (SCREEN_WIDTH - 132, 20))
 
     def draw_controls_hint(self, surface: pygame.Surface) -> None:
-        hint = self.small.render("A/D MOVE   SPACE JUMP   SHIFT RUN   E DELIVER   Q RETURN   P PAUSE", False, (41, 64, 86))
-        surface.blit(hint, hint.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 14)))
+        label = "A/D MOVE   SPACE JUMP   SHIFT RUN   E DELIVER   Q RETURN   P PAUSE"
+        shadow = self.small.render(label, False, COLORS["black"])
+        hint = self.small.render(label, False, COLORS["white"])
+        center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT - 14)
+        surface.blit(shadow, shadow.get_rect(center=(center[0] + 1, center[1] + 1)))
+        surface.blit(hint, hint.get_rect(center=center))
 
     def draw_center_message(self, surface: pygame.Surface, message: str, timer: float) -> None:
         scale = 1.0 + max(0.0, min(0.25, timer * 0.08))

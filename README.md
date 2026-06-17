@@ -36,6 +36,12 @@ If your system only exposes Python as `python3`, use `python3` for the same comm
 
 You have 120 seconds to complete as many orders as possible. Correct deliveries increase score, combo, and time. Wrong deliveries keep the item in the bag, reset combo, reduce time, and shake the screen. The return pipe lets you recover from mistakes, but only by popping the stack top and paying a penalty.
 
+The map now has a parkour route: collect items around the lower supply pipes, climb toward the upper-left return pipe to discard the stack top with `Q`, or climb toward the upper-right delivery pipe to deliver with `E`. Supply pipes stay in their original positions. Pipes are not solid walls; they are visible interaction targets.
+
+Question blocks above the floor can be hit from below while jumping to gain a small time bonus.
+
+Small helper and hazard characters spawn occasionally from the CC0 `characters_packed.png` sheet. Stomp them while falling for effects such as time bonus, time penalty, queue refresh, or a small score bonus.
+
 Implemented item types:
 
 - Mushroom: 100 points
@@ -52,6 +58,8 @@ This game turns a familiar platform-jump style into a delivery puzzle. The order
 
 `tools/download_assets.py` optionally downloads CC0 Kenney Pixel Platformer sheets through raw GitHub URLs from [uheartbeast/Pixel-Platformer](https://github.com/uheartbeast/Pixel-Platformer). Kenney's official page lists Pixel Platformer as Creative Commons CC0: <https://kenney.nl/assets/pixel-platformer>.
 
-No Nintendo sprites, logos, audio, ROM material, or other unlicensed IP are included. The Mario-like feeling is produced with original procedural placeholders: bright sky, green pipes, brick blocks, question blocks, coin particles, and a red-cap platformer character.
+The gameplay BGM is a generated upbeat 8-bit/retro platformer WAV loop created locally by `tools/download_assets.py` at `assets/music/gameplay_retro_platformer.wav`. If it is missing, the game falls back to `assets/music/ttg_chiptune_loop.wav`, and if audio loading fails the game continues silently.
+
+No Nintendo sprites, logos, audio, ROM material, or other unlicensed IP are included. The Mario-like feeling is produced with original procedural placeholders: bright sky, green pipes, brick blocks, question blocks, coin particles, generated chiptune-style audio, and a red-cap platformer character.
 
 If downloads fail, the game still runs from generated placeholder PNGs and in-code fallback surfaces. See `assets/CREDITS.md` and `assets/manifest.json` for source, license, URL, and SHA256 details after running the downloader.

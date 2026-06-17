@@ -15,10 +15,15 @@ class Pipe:
         width: int,
         height: int,
         label: str,
+        inverted: bool = False,
     ) -> None:
         self.pipe_id = pipe_id
         self.kind = kind
-        self.rect = pygame.Rect(center_x - width // 2, bottom_y - height, width, height)
+        self.inverted = inverted
+        if inverted:
+            self.rect = pygame.Rect(center_x - width // 2, bottom_y, width, height)
+        else:
+            self.rect = pygame.Rect(center_x - width // 2, bottom_y - height, width, height)
         self.label = label
         self.glow_timer = 0.0
         self.flash_timer = 0.0
@@ -26,10 +31,14 @@ class Pipe:
 
     @property
     def mouth(self) -> tuple[int, int]:
+        if self.inverted:
+            return self.rect.centerx, self.rect.bottom - 8
         return self.rect.centerx, self.rect.top + 8
 
     @property
     def interaction_zone(self) -> pygame.Rect:
+        if self.inverted:
+            return pygame.Rect(self.rect.centerx - 112, self.rect.bottom - 56, 224, 124)
         return self.rect.inflate(80, 34)
 
     def player_near(self, player_rect: pygame.Rect) -> bool:
@@ -60,13 +69,22 @@ class Pipe:
             color = COLORS["red"]
             dark = (122, 20, 30)
 
-        mouth_rect = pygame.Rect(rect.x - 8, rect.y, rect.width + 16, 18)
-        pygame.draw.rect(surface, dark, rect)
-        pygame.draw.rect(surface, color, rect.inflate(-8, 0))
-        pygame.draw.rect(surface, dark, mouth_rect)
-        pygame.draw.rect(surface, color, mouth_rect.inflate(-6, -4))
-        pygame.draw.rect(surface, light, (rect.x + 9, rect.y + 18, 8, rect.height - 22))
-        pygame.draw.rect(surface, (10, 70, 34), mouth_rect, 3)
+        if self.inverted:
+            mouth_rect = pygame.Rect(rect.x - 8, rect.bottom - 18, rect.width + 16, 18)
+            pygame.draw.rect(surface, dark, rect)
+            pygame.draw.rect(surface, color, rect.inflate(-8, 0))
+            pygame.draw.rect(surface, dark, mouth_rect)
+            pygame.draw.rect(surface, color, mouth_rect.inflate(-6, -4))
+            pygame.draw.rect(surface, light, (rect.x + 9, rect.y + 4, 8, rect.height - 22))
+            pygame.draw.rect(surface, (10, 70, 34), mouth_rect, 3)
+        else:
+            mouth_rect = pygame.Rect(rect.x - 8, rect.y, rect.width + 16, 18)
+            pygame.draw.rect(surface, dark, rect)
+            pygame.draw.rect(surface, color, rect.inflate(-8, 0))
+            pygame.draw.rect(surface, dark, mouth_rect)
+            pygame.draw.rect(surface, color, mouth_rect.inflate(-6, -4))
+            pygame.draw.rect(surface, light, (rect.x + 9, rect.y + 18, 8, rect.height - 22))
+            pygame.draw.rect(surface, (10, 70, 34), mouth_rect, 3)
 
         if self.glow_timer > 0:
             alpha = int(150 * min(1.0, self.glow_timer / 0.45))
@@ -75,7 +93,8 @@ class Pipe:
             surface.blit(glow, glow.get_rect(center=rect.center))
 
         if self.suction_timer > 0:
-            center = rect.centerx, rect.top + 8
+            center = self.mouth
+            center = center[0] + offset[0], center[1] + offset[1]
             radius = int(20 + self.suction_timer * 28)
             pygame.draw.circle(surface, (255, 230, 230), center, radius, 3)
 
@@ -86,7 +105,10 @@ class Pipe:
             return
         sign_w = max(58, len(self.label) * 8 + 16)
         sign_rect = pygame.Rect(0, 0, sign_w, 24)
-        sign_rect.center = (self.rect.centerx + offset[0], self.rect.top + offset[1] - 16)
+        if self.inverted:
+            sign_rect.center = (self.rect.centerx + offset[0], self.rect.bottom + offset[1] + 34)
+        else:
+            sign_rect.center = (self.rect.centerx + offset[0], self.rect.top + offset[1] - 16)
         pygame.draw.rect(surface, COLORS["panel_shadow"], sign_rect.move(3, 3))
         pygame.draw.rect(surface, COLORS["panel"], sign_rect)
         pygame.draw.rect(surface, COLORS["brick_dark"], sign_rect, 2)

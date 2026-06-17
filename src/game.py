@@ -4,7 +4,10 @@ import random
 
 import pygame
 
+from src.audio import AudioManager
 from src.asset_manager import AssetManager
+from src.bonus import BonusBox
+from src.creatures import CreatureEffect, CreatureManager
 from src.items import Item
 from src.particles import ParticleSystem
 from src.pipes import Pipe
@@ -39,6 +42,7 @@ class Game:
         self.particles = ParticleSystem()
         self.small_font = pygame.font.Font(None, 20)
         self.float_font = pygame.font.Font(None, 25)
+        self.audio = AudioManager()
         self.rng = random.Random()
 
         self.state = self.TITLE
@@ -47,6 +51,7 @@ class Game:
         self.reset_game()
         if smoke_test:
             self.state = self.PLAYING
+            self.audio.play_gameplay()
 
     def reset_game(self) -> None:
         self.system = DeliverySystem(self.rng)
@@ -63,26 +68,33 @@ class Game:
 
         self.platforms = [
             pygame.Rect(0, GROUND_Y, SCREEN_WIDTH, SCREEN_HEIGHT - GROUND_Y),
-            pygame.Rect(250, 366, 160, 24),
-            pygame.Rect(568, 300, 190, 24),
-            pygame.Rect(96, 270, 122, 24),
-            pygame.Rect(314, 236, 96, 24),
+            pygame.Rect(80, 430, 170, 24),
+            pygame.Rect(230, 355, 150, 24),
+            pygame.Rect(65, 250, 180, 24),
+            pygame.Rect(50, 155, 230, 24),
+            pygame.Rect(390, 420, 150, 24),
+            pygame.Rect(424, 318, 120, 24),
+            pygame.Rect(268, 245, 100, 24),
+            pygame.Rect(600, 300, 160, 24),
+            pygame.Rect(620, 390, 150, 24),
+            pygame.Rect(816, 285, 124, 24),
+            pygame.Rect(610, 230, 110, 24),
+            pygame.Rect(700, 155, 220, 24),
         ]
-        self.question_blocks = [
-            pygame.Rect(312, 334, 32, 32),
-            pygame.Rect(344, 334, 32, 32),
-            pygame.Rect(662, 268, 32, 32),
-            pygame.Rect(132, 238, 32, 32),
+        self.bonus_boxes = [
+            BonusBox(self.assets, pygame.Rect(320, 379, 32, 32)),
+            BonusBox(self.assets, pygame.Rect(456, 342, 32, 32)),
+            BonusBox(self.assets, pygame.Rect(170, 274, 32, 32)),
         ]
-        self.platforms.extend(self.question_blocks)
 
         self.pipes = {
             "A": Pipe("A", "supply", 150, GROUND_Y, 54, 76, "A"),
             "B": Pipe("B", "supply", 430, GROUND_Y, 54, 76, "B"),
             "C": Pipe("C", "supply", 650, 300, 54, 64, "C"),
-            "D": Pipe("D", "delivery", 840, GROUND_Y, 68, 92, "DELIVER"),
-            "R": Pipe("R", "return", 60, GROUND_Y, 54, 72, "RETURN"),
+            "D": Pipe("D", "delivery", 810, HUD_HEIGHT, 68, 64, "DELIVER", inverted=True),
+            "R": Pipe("R", "return", 140, HUD_HEIGHT, 54, 64, "RETURN", inverted=True),
         }
+        self.creatures = CreatureManager(self.assets, self.rng)
 
     def run(self) -> int:
         while self.running:
@@ -107,18 +119,22 @@ class Game:
                 elif self.state == self.TITLE and event.key == pygame.K_RETURN:
                     self.reset_game()
                     self.state = self.PLAYING
+                    self.audio.play_gameplay()
                 elif self.state == self.PLAYING:
                     self._handle_playing_keydown(event.key)
                 elif self.state == self.PAUSED:
                     if event.key == pygame.K_p:
                         self.state = self.PLAYING
+                        self.audio.unpause()
                 elif self.state == self.GAME_OVER and event.key == pygame.K_r:
                     self.reset_game()
                     self.state = self.PLAYING
+                    self.audio.play_gameplay()
 
     def _handle_playing_keydown(self, key: int) -> None:
         if key == pygame.K_p:
             self.state = self.PAUSED
+            self.audio.pause()
         elif key == pygame.K_SPACE:
             self.player.handle_keydown(key)
         elif key == pygame.K_e:
@@ -143,16 +159,23 @@ class Game:
 
         for pipe in self.pipes.values():
             pipe.update(dt)
+        for box in self.bonus_boxes:
+            box.update(dt)
 
         keys = pygame.key.get_pressed()
-        self.player.update(dt, keys, self.platforms)
+        previous_rect = self.player.rect.copy()
+        previous_vel_y = self.player.vel.y
+        self.player.update(dt, keys, self._player_collision_platforms())
+        self._update_bonus_boxes(previous_rect, previous_vel_y)
         self._update_items(dt)
+        self._update_creatures(dt)
         self._update_spawns()
         self.particles.update(dt)
 
         if self.time_left <= 0:
             self.time_left = 0
             self.state = self.GAME_OVER
+            self.audio.stop()
             self.set_message("TIME UP!", 1.6)
 
     def draw(self) -> None:
@@ -165,6 +188,7 @@ class Game:
 
         for item in self.items:
             item.draw(world)
+        self.creatures.draw(world)
         self.player.draw(world)
         self.particles.draw(world, self.float_font)
 
@@ -196,8 +220,9 @@ class Game:
 
     def _update_items(self, dt: float) -> None:
         kept: list[Item] = []
+        item_platforms = self._item_collision_platforms()
         for item in self.items:
-            item.update(dt, self.platforms)
+            item.update(dt, item_platforms)
             if item.expired:
                 self.particles.smoke(item.rect.center, 9)
                 continue
@@ -214,6 +239,46 @@ class Game:
             kept.append(item)
         self.items = kept
 
+    def _update_bonus_boxes(self, previous_rect: pygame.Rect, previous_vel_y: float) -> None:
+        for box in self.bonus_boxes:
+            if not box.try_head_hit(self.player, previous_rect, previous_vel_y):
+                continue
+            self.time_left = min(GAME_TIME + 25, self.time_left + box.time_bonus)
+            self.player.vel.y = 120.0
+            self.particles.burst(box.rect.center, COLORS["yellow"], count=14, speed=(40, 140), gravity=260)
+            self.particles.floating_text(f"+{int(box.time_bonus)} SEC", (box.rect.centerx, box.rect.top), COLORS["green"])
+            self.set_message("TIME BONUS!", 0.7)
+            break
+
+    def _update_creatures(self, dt: float) -> None:
+        avoid_rects = [pipe.rect.inflate(28, 12) for pipe in self.pipes.values()]
+        avoid_rects.extend([self.pipes["D"].interaction_zone, self.pipes["R"].interaction_zone])
+        effects = self.creatures.update(
+            dt,
+            int(self.elapsed_ms),
+            self.player,
+            self._creature_collision_platforms(),
+            self._creature_spawn_surfaces(),
+            avoid_rects,
+        )
+        for effect in effects:
+            self._apply_creature_effect(effect)
+
+    def _apply_creature_effect(self, effect: CreatureEffect) -> None:
+        if effect.effect == "time_penalty":
+            self.time_left = max(0.0, self.time_left - 3.0)
+            self.start_shake(0.18, 5)
+        elif effect.effect == "time_bonus":
+            self.time_left = min(GAME_TIME + 25, self.time_left + 5.0)
+        elif effect.effect == "queue_refresh":
+            self.system.refresh_delivery_queue(int(self.elapsed_ms))
+        elif effect.effect == "score_bonus":
+            self.score += 100
+
+        self.particles.burst(effect.pos, effect.color, count=12, speed=(45, 130), gravity=220)
+        self.particles.floating_text(effect.text, effect.pos, effect.color)
+        self.set_message(effect.text, 0.85)
+
     def _update_spawns(self) -> None:
         visible = {item.kind for item in self.items}
         self.system.schedule_spawn_events(int(self.elapsed_ms), visible)
@@ -226,6 +291,19 @@ class Game:
         self.items.append(Item(self.assets, event.item_kind, pipe.mouth, speed_multiplier))
         self.particles.smoke(pipe.mouth, 8)
         pipe.trigger_glow()
+
+    def _player_collision_platforms(self) -> list[pygame.Rect]:
+        return self.platforms
+
+    def _item_collision_platforms(self) -> list[pygame.Rect]:
+        return self.platforms
+
+    def _creature_collision_platforms(self) -> list[pygame.Rect]:
+        return self.platforms
+
+    def _creature_spawn_surfaces(self) -> list[pygame.Rect]:
+        # Keep NPC pressure around the lower/mid route, not on the final delivery/return ledges.
+        return [platform for platform in self.platforms if platform.top >= 230]
 
     def _apply_delivery_result(self, result: DeliveryResult, pipe: Pipe) -> None:
         if result.ok:
@@ -318,17 +396,16 @@ class Game:
 
     def _draw_brick_platforms(self, surface: pygame.Surface) -> None:
         brick = self.assets.brick_tile(TILE_SIZE)
-        q_block = self.assets.question_block(TILE_SIZE)
 
         for y in range(GROUND_Y, SCREEN_HEIGHT, TILE_SIZE):
             for x in range(0, SCREEN_WIDTH, TILE_SIZE):
                 surface.blit(brick, (x, y))
 
-        for platform in self.platforms[1:5]:
+        for platform in self.platforms[1:]:
             for x in range(platform.left, platform.right, TILE_SIZE):
                 surface.blit(brick, (x, platform.top))
 
-        for block in self.question_blocks:
-            surface.blit(q_block, block.topleft)
+        for box in self.bonus_boxes:
+            box.draw(surface)
 
         pygame.draw.rect(surface, (74, 43, 30), (0, GROUND_Y - 2, SCREEN_WIDTH, 4))
